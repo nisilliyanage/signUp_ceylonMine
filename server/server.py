@@ -121,7 +121,7 @@ def signup():
                 'username': data['username'],
                 'email': data['email'],
                 'password': hashed_password,
-                'role': 'public'  # Set default role
+                'role': 'public'  # Set default role as needed
             }).execute()
             
             return jsonify({
