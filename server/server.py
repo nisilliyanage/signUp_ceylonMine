@@ -1,6 +1,4 @@
 import os
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from secrets import token_urlsafe
@@ -9,14 +7,11 @@ from dotenv import load_dotenv
 from supabase import create_client
 import bcrypt
 
-# Load environment variables
 load_dotenv()
 
-# Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
-# Initialize Supabase client
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 
@@ -30,42 +25,8 @@ except Exception as e:
     print(f"Error connecting to Supabase: {str(e)}")
     raise e
 
-# Configure SendGrid
-load_dotenv()
-SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
-FROM_EMAIL = os.getenv('FROM_EMAIL')
-FRONTEND_URL = os.getenv('FRONTEND_URL')
-
 # Store reset tokens with expiry (in memory - will be cleared when server restarts)
 reset_tokens = {}
-
-def send_reset_email(to_email, reset_token):
-    try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        
-        # Create the email
-        reset_link = f"{FRONTEND_URL}/reset-password/{reset_token}"
-        html_content = f"""
-            <h2>Password Reset Request</h2>
-            <p>You requested to reset your password. Click the link below to set a new password:</p>
-            <p><a href="{reset_link}">Reset Password</a></p>
-            <p>If you didn't request this, you can safely ignore this email.</p>
-            <p>This link will expire in 1 hour.</p>
-        """
-        
-        message = Mail(
-            from_email=FROM_EMAIL,
-            to_emails=to_email,
-            subject='Password Reset Request',
-            html_content=html_content
-        )
-        
-        # Send the email
-        response = sg.send(message)
-        return True
-    except Exception as e:
-        print(f"Error sending email: {str(e)}")
-        return False
 
 def hash_password(password):
     # Convert the password to bytes
@@ -121,7 +82,7 @@ def signup():
                 'username': data['username'],
                 'email': data['email'],
                 'password': hashed_password,
-                'role': 'public'  # Set default role as needed
+                'role': 'public'  
             }).execute()
             
             return jsonify({
@@ -197,11 +158,12 @@ def request_reset():
             result = supabase.table('users').select('*').eq('email', email).execute()
             
             if len(result.data) == 0:
+                # Don't reveal if email exists or not
                 return jsonify({'message': 'If the email exists, a reset token will be sent'}), 200
             
             # Generate reset token
             reset_token = token_urlsafe(32)
-            print(f"Generated token: {reset_token} for email: {email}")
+            print(f"Generated token: {reset_token} for email: {email}")  # Debug print
             
             # Store token with expiry (1 hour)
             reset_tokens[reset_token] = {
@@ -209,6 +171,7 @@ def request_reset():
                 'expiry': datetime.now() + timedelta(hours=1)
             }
             
+            # Return the token directly
             return jsonify({
                 'message': 'Password reset token generated',
                 'token': reset_token
@@ -226,34 +189,26 @@ def request_reset():
 def reset_password():
     try:
         data = request.get_json()
-        token = data.get('token')
-        new_password = data.get('password')
+        email = data.get('email')
+        new_password = data.get('newPassword')
         
-        if not token or not new_password:
-            return jsonify({'error': 'Token and new password are required'}), 400
-        
-        # Verify token
-        token_data = reset_tokens.get(token)
-        if not token_data:
-            return jsonify({'error': 'Invalid or expired token'}), 400
-        
-        # Check token expiry
-        if datetime.now() > token_data['expiry']:
-            del reset_tokens[token]
-            return jsonify({'error': 'Token has expired'}), 400
+        if not email or not new_password:
+            return jsonify({'error': 'Email and new password are required'}), 400
         
         try:
+            # Check if user exists
+            result = supabase.table('users').select('*').eq('email', email).execute()
+            
+            if len(result.data) == 0:
+                return jsonify({'error': 'Email not found'}), 404
+            
             # Hash the new password
             hashed_password = hash_password(new_password)
-            print(f"Updating password for email: {token_data['email']}")
             
             # Update password in database
             result = supabase.table('users').update({
                 'password': hashed_password
-            }).eq('email', token_data['email']).execute()
-            
-            # Remove used token
-            del reset_tokens[token]
+            }).eq('email', email).execute()
             
             return jsonify({'message': 'Password updated successfully'}), 200
             

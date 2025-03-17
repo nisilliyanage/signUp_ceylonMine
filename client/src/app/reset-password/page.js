@@ -3,53 +3,29 @@ import { useState } from 'react';
 import styles from '../page.module.css';
 
 export default function ResetPassword() {
-  const [step, setStep] = useState('request'); // 'request' or 'reset'
-  const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formData, setFormData] = useState({
+    email: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
-  const handleRequestReset = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    setIsError(false);
-
-    try {
-      const response = await fetch('http://localhost:8080/api/request-reset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-      console.log('Request Reset Response:', data);  // Debug log
-
-      if (response.ok) {
-        setToken(data.token); // Store the token
-        setStep('reset'); // Move to reset step
-        setMessage('Please enter your new password');
-        setIsError(false);
-      } else {
-        setMessage(data.error || 'Failed to process request');
-        setIsError(true);
-      }
-    } catch (error) {
-      console.error('Error:', error);  // Debug log
-      setMessage('Error connecting to server');
-      setIsError(true);
-    }
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleResetPassword = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
     setIsError(false);
 
-    if (password !== confirmPassword) {
+    // Check if passwords match
+    if (formData.newPassword !== formData.confirmPassword) {
       setMessage('Passwords do not match');
       setIsError(true);
       return;
@@ -62,23 +38,28 @@ export default function ResetPassword() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token,
-          password,
+          email: formData.email,
+          newPassword: formData.newPassword
         }),
       });
 
       const data = await response.json();
-      console.log('Reset Password Response:', data);  // Debug log
 
       if (response.ok) {
         setMessage('Password updated successfully! You can now login with your new password.');
         setIsError(false);
+        // Clear form
+        setFormData({
+          email: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
       } else {
         setMessage(data.error || 'Failed to reset password');
         setIsError(true);
       }
     } catch (error) {
-      console.error('Error:', error);  // Debug log
+      console.error('Error:', error);
       setMessage('Error connecting to server');
       setIsError(true);
     }
@@ -86,56 +67,54 @@ export default function ResetPassword() {
 
   return (
     <div className={styles.container}>
-      <form onSubmit={step === 'request' ? handleRequestReset : handleResetPassword} className={styles.form}>
+      <form onSubmit={handleSubmit} className={styles.form}>
         <h1>Reset Password</h1>
-
+        
         {message && (
           <div className={isError ? styles.error : styles.success}>
             {message}
           </div>
         )}
 
-        {step === 'request' ? (
-          <div className={styles.formGroup}>
-            <label htmlFor="email">Email:</label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-        ) : (
-          <>
-            <div className={styles.formGroup}>
-              <label htmlFor="password">New Password:</label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label htmlFor="confirmPassword">Confirm Password:</label>
-              <input
-                type="password"
-                id="confirmPassword"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-            </div>
-          </>
-        )}
+        <div className={styles.formGroup}>
+          <label htmlFor="email">Email:</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
 
-        <button type="submit">
-          {step === 'request' ? 'Request Reset' : 'Reset Password'}
-        </button>
+        <div className={styles.formGroup}>
+          <label htmlFor="newPassword">New Password:</label>
+          <input
+            type="password"
+            id="newPassword"
+            name="newPassword"
+            value={formData.newPassword}
+            onChange={handleChange}
+            required
+            minLength={8}
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label htmlFor="confirmPassword">Confirm New Password:</label>
+          <input
+            type="password"
+            id="confirmPassword"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            required
+            minLength={8}
+          />
+        </div>
+
+        <button type="submit">Update Password</button>
 
         <p className={styles.linkText}>
           <a href="/login">Back to Login</a>

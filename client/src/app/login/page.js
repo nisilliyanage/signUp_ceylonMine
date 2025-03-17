@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import styles from '../page.module.css'  
+import { useRouter } from 'next/navigation'
 
 function LoginPage() {
   const [formData, setFormData] = useState({
@@ -9,31 +10,41 @@ function LoginPage() {
     password: ''
   });
   const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage('');
+    setIsError(false);
+
     try {
       const response = await fetch('http://localhost:8080/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
-        setMessage('Login successful!');
-        // Here you might want to:
-        // 1. Store the user data in state management (like Redux or Context)
-        // 2. Store a token in localStorage
-        // 3. Redirect to a dashboard page
+        // Store user data in localStorage
+        localStorage.setItem('user', JSON.stringify(data.user));
+        // Redirect to home page
+        router.push('/home');
       } else {
         setMessage(data.error || 'Login failed');
+        setIsError(true);
       }
     } catch (error) {
+      console.error('Error:', error);
       setMessage('Error connecting to server');
+      setIsError(true);
     }
   };
 
@@ -75,12 +86,12 @@ function LoginPage() {
 
         <button type="submit">Login</button>
         
-        {message && <p className={message.includes('successful') ? styles.success : styles.error}>
+        {message && <p className={isError ? styles.error : styles.success}>
           {message}
         </p>}
 
         <p className={styles.linkText}>
-          <a href="/forgot-password">Forgot Password?</a>
+          Forgot your password? <a href="/reset-password">Reset it here</a>
         </p>
       </form>
     </div>
